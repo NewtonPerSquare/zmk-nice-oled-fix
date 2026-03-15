@@ -32,25 +32,30 @@ static const void *idle_images[] = {&idle_img1, &idle_img2, &idle_img3, &idle_im
 static const void *tap_images[] = {&fast_img1, &fast_img2};
 */
 
-LV_IMG_DECLARE(bongo_cat_both1_open_90);
-LV_IMG_DECLARE(bongo_cat_both1_open_90);
-LV_IMG_DECLARE(bongo_cat_both1_open_90);
-LV_IMG_DECLARE(bongo_cat_both1_90);
-LV_IMG_DECLARE(bongo_cat_both1_90);
-LV_IMG_DECLARE(bongo_cat_right2_90);
-LV_IMG_DECLARE(bongo_cat_left2_90);
+LV_IMG_DECLARE(bongo_cat_double_tap1_06);
+LV_IMG_DECLARE(bongo_cat_double_tap1_05);
+LV_IMG_DECLARE(bongo_cat_double_tap1_04);
+LV_IMG_DECLARE(bongo_cat_tap1_03);
+LV_IMG_DECLARE(bongo_cat_tap2_03);
 
-static const void *idle_images[] = {&bongo_cat_both1_open_90, &bongo_cat_both1_open_90,
-                                    &bongo_cat_both1_90, &bongo_cat_both1_90,
-                                    &bongo_cat_both1_open_90};
+static const void *idle_images[] = {
+    &bongo_cat_double_tap1_06,
+    &bongo_cat_double_tap1_05,
+    &bongo_cat_double_tap1_06,
+    &bongo_cat_double_tap1_04,
+    &bongo_cat_double_tap1_06,
+};
 
-static const void *tap_images[] = {&bongo_cat_right2_90, &bongo_cat_left2_90};
+static const void *tap_images[] = {
+    &bongo_cat_tap1_03,
+    &bongo_cat_tap2_03,
+};
 
 #define IDLE_FRAMES 5
 #define TAP_FRAMES 2
-#define IDLE_ANIM_TIME 1000   // 1 second for full idle cycle
-#define IDLE_TIMEOUT_MS 500   // Return to idle after 500ms of no keypresses
-#define IDLE_CHECK_PERIOD 100 // Check for idle every 100ms
+#define IDLE_ANIM_TIME 900
+#define IDLE_TIMEOUT_MS 140
+#define IDLE_CHECK_PERIOD 25
 
 struct responsive_bongo_cat_state {
     bool key_pressed;
@@ -103,8 +108,8 @@ static void play_tap_animation(lv_obj_t *obj) {
     lv_anim_del(obj, set_idle_frame); // Stop idle animation if running
 
     static uint8_t current_frame = 0;
-    current_frame = (current_frame + 1) % TAP_FRAMES;
     lv_img_set_src(obj, tap_images[current_frame]);
+    current_frame = (current_frame + 1) % TAP_FRAMES;
 }
 
 static void update_responsive_bongo_cat_anim(struct zmk_widget_responsive_bongo_cat *widget,
