@@ -5,7 +5,7 @@
  */
 #include <zephyr/kernel.h>
 #include <zmk/event_manager.h>
-#include <zmk/events/keycode_state_changed.h>
+#include <zmk/events/position_state_changed.h>
 #include <zephyr/logging/log.h>
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
@@ -39,11 +39,7 @@ LV_IMG_DECLARE(bongo_cat_tap1_03);
 LV_IMG_DECLARE(bongo_cat_tap2_03);
 
 static const void *idle_images[] = {
-    &bongo_cat_double_tap1_06,
     &bongo_cat_double_tap1_05,
-    &bongo_cat_double_tap1_06,
-    &bongo_cat_double_tap1_04,
-    &bongo_cat_double_tap1_06,
 };
 
 static const void *tap_images[] = {
@@ -51,21 +47,27 @@ static const void *tap_images[] = {
     &bongo_cat_tap2_03,
 };
 
-#define IDLE_FRAMES 5
+#define IDLE_FRAMES 1
 #define TAP_FRAMES 2
 #define IDLE_ANIM_TIME 900
-#define IDLE_TIMEOUT_MS 140
+#define IDLE_TIMEOUT_MS 700
 #define IDLE_CHECK_PERIOD 25
+
+enum paw_side {
+    PAW_LEFT,
+    PAW_RIGHT,
+};
 
 struct responsive_bongo_cat_state {
     bool key_pressed;
     uint32_t last_tap;
     lv_obj_t *obj; // Store reference to the image object
     bool is_idle;  // Track if we're already in idle animation
+    enum paw_side paw;
 };
 
 static struct responsive_bongo_cat_state current_state = {
-    .key_pressed = false, .last_tap = 0, .obj = NULL, .is_idle = true};
+    .key_pressed = false, .last_tap = 0, .obj = NULL, .is_idle = true, .paw = PAW_LEFT,};
 
 static void set_idle_frame(void *var, int32_t val) {
     LOG_DBG("BONGO: Idle animation frame: %d", val);
@@ -102,14 +104,16 @@ static void check_idle_timeout(lv_timer_t *timer) {
     }
 }
 
-static void play_tap_animation(lv_obj_t *obj) {
+static void play_tap_animation(lv_obj_t *obj, enum paw_side paw) {
     LOG_DBG("BONGO: Playing tap animation");
     current_state.is_idle = false;
     lv_anim_del(obj, set_idle_frame); // Stop idle animation if running
 
-    static uint8_t current_frame = 0;
-    lv_img_set_src(obj, tap_images[current_frame]);
-    current_frame = (current_frame + 1) % TAP_FRAMES;
+    if (paw == PAW_LEFT) {
+        lv_img_set_src(obj, &bongo_cat_tap1_03);
+    } else {
+        lv_img_set_src(obj, &bongo_cat_tap2_03);
+    }
 }
 
 static void update_responsive_bongo_cat_anim(struct zmk_widget_responsive_bongo_cat *widget,
@@ -122,15 +126,22 @@ static void update_responsive_bongo_cat_anim(struct zmk_widget_responsive_bongo_
     current_state.obj = widget->obj; // Update the global state
 
     if (state.key_pressed) {
-        play_tap_animation(widget->obj);
+        play_tap_animation(widget->obj, state.paw);
     }
 }
 
 static struct responsive_bongo_cat_state responsive_bongo_cat_get_state(const zmk_event_t *eh) {
-    const struct zmk_keycode_state_changed *ev = as_zmk_keycode_state_changed(eh);
-    if (ev != NULL && ev->state) { // Only update on key press, not release
+    const struct zmk_position_state_changed *ev = as_zmk_position_state_changed(eh);
+
+    if (ev != NULL && ev->state) {
         current_state.key_pressed = true;
         current_state.last_tap = k_uptime_get_32();
+
+        if (ev->source == ZMK_POSITION_STATE_CHANGE_SOURCE_LOCAL) {
+            current_state.paw = PAW_LEFT;
+        } else {
+            current_state.paw = PAW_RIGHT;
+        }
     } else {
         current_state.key_pressed = false;
     }
@@ -147,7 +158,7 @@ static void responsive_bongo_cat_update_cb(struct responsive_bongo_cat_state sta
 
 ZMK_DISPLAY_WIDGET_LISTENER(widget_responsive_bongo_cat, struct responsive_bongo_cat_state,
                             responsive_bongo_cat_update_cb, responsive_bongo_cat_get_state)
-ZMK_SUBSCRIPTION(widget_responsive_bongo_cat, zmk_keycode_state_changed);
+ZMK_SUBSCRIPTION(widget_responsive_bongo_cat, zmk_position_state_changed);
 
 int zmk_widget_responsive_bongo_cat_init(struct zmk_widget_responsive_bongo_cat *widget,
                                          lv_obj_t *parent) {
