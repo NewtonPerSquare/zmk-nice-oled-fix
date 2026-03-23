@@ -17,6 +17,7 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 static sys_slist_t widgets = SYS_SLIST_STATIC_INIT(&widgets);
 static lv_anim_t idle_anim;
 static lv_timer_t *idle_check_timer = NULL;
+static lv_timer_t *tap_release_timer = NULL;
 
 /*
 LV_IMG_DECLARE(idle_img1);
@@ -104,17 +105,31 @@ static void check_idle_timeout(lv_timer_t *timer) {
     }
 }
 
+static void release_tap_frame(lv_timer_t *timer) {
+    if (current_state.obj != NULL && !current_state.is_idle) {
+        lv_img_set_src(current_state.obj, idle_images[0]);
+    }
+
+    lv_timer_pause(timer);
+}
+
 static void play_tap_animation(lv_obj_t *obj, enum paw_side paw) {
     LOG_DBG("BONGO: Playing tap animation");
     current_state.is_idle = false;
-    lv_anim_del(obj, set_idle_frame); // Stop idle animation if running
+    lv_anim_del(obj, set_idle_frame);
 
     if (paw == PAW_LEFT) {
         lv_img_set_src(obj, &bongo_cat_tap1_03);
     } else {
         lv_img_set_src(obj, &bongo_cat_tap2_03);
     }
-}
+
+    if (tap_release_timer != NULL) {
+        lv_timer_set_period(tap_release_timer, 60);
+        lv_timer_resume(tap_release_timer);
+        lv_timer_reset(tap_release_timer);
+    }
+}           
 
 static void update_responsive_bongo_cat_anim(struct zmk_widget_responsive_bongo_cat *widget,
                                              struct responsive_bongo_cat_state state) {
@@ -164,14 +179,17 @@ int zmk_widget_responsive_bongo_cat_init(struct zmk_widget_responsive_bongo_cat 
                                          lv_obj_t *parent) {
     widget->obj = lv_img_create(parent);
 
-    // Initialize idle check timer
     if (idle_check_timer == NULL) {
         idle_check_timer = lv_timer_create(check_idle_timeout, IDLE_CHECK_PERIOD, NULL);
     }
 
-    // Start with idle animation
+    if (tap_release_timer == NULL) {
+        tap_release_timer = lv_timer_create(release_tap_frame, 60, NULL);
+        lv_timer_pause(tap_release_timer);
+    }
+
     current_state.obj = widget->obj;
-    current_state.is_idle = false; // Set to false so initial animation will start
+    current_state.is_idle = false;
     start_idle_animation(widget->obj);
 
     sys_slist_append(&widgets, &widget->node);
